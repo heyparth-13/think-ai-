@@ -293,7 +293,7 @@ export const ChatWindow: React.FC = () => {
         />
 
         {/* Main Conversation or Hero */}
-        <main className="flex-1 flex flex-col justify-between max-w-5xl w-full mx-auto px-3 sm:px-6 pt-2 pb-28 sm:pb-32">
+        <main className="flex-1 flex flex-col justify-between max-w-5xl w-full mx-auto px-2.5 sm:px-6 pt-1 sm:pt-2 pb-24 sm:pb-32">
           {messages.length === 0 ? (
             <HeroSection
               selectedCategory={selectedCategory}

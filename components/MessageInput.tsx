@@ -106,7 +106,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             value={input}
             onChange={handleInput}
             onKeyDown={handleKeyDown}
-            placeholder={isRecording ? "Listening... Speak now..." : placeholder}
+            placeholder={isRecording ? "Listening... Speak now..." : "Ask Think AI about services, tech stack, or your project..."}
             disabled={isLoading}
             className="min-w-0 flex-1 max-h-28 sm:max-h-32 min-h-[38px] sm:min-h-[44px] py-2 sm:py-2.5 px-2.5 sm:px-3 bg-transparent text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 text-xs sm:text-sm md:text-base outline-none resize-none font-medium disabled:opacity-60 leading-normal"
           />

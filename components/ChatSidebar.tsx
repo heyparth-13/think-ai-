@@ -22,34 +22,39 @@ export interface ProjectChatOption {
 
 export const PROJECT_CHAT_OPTIONS: ProjectChatOption[] = [
   {
-    id: 'ai-ml',
-    title: 'AI & Machine Learning',
-    prompt: "I want help with an AI and machine learning project. Ask what I'm building and what stage it's at, then help with project-specific questions, technical decisions, progress updates, and next steps based on the details I share."
+    id: 'ai-chatbot',
+    title: 'AI Chatbot Platform',
+    prompt: "Tell me about the ThinkArq AI Chatbot project — what it is, its purpose, features, tech stack, and the results achieved."
   },
   {
-    id: 'data-analytics',
-    title: 'Data & Analytics',
-    prompt: "I want help with a data engineering and analytics project. Ask about my data sources, goals, and current stage, then help with project-specific questions, implementation decisions, progress updates, and next steps based on the details I share."
+    id: 'data-pipeline',
+    title: 'E-Commerce Data Pipeline',
+    prompt: "Tell me about the Real-Time E-Commerce Analytics and Data Pipeline project — what it is, its purpose, features, tech stack, and results."
   },
   {
-    id: 'saas-software',
-    title: 'SaaS & Software',
-    prompt: "I want help with a SaaS or custom software project. Ask what we're building, who it's for, and its current stage, then help with project-specific questions, architecture, implementation, progress updates, and next steps based on the details I share."
+    id: 'saas-platform',
+    title: 'AI SaaS Recruitment Platform',
+    prompt: "Tell me about the AI-Powered SaaS Recruitment Platform project — what it is, its purpose, features, tech stack, and results achieved."
   },
   {
-    id: 'ui-ux',
-    title: 'UI/UX & Product Design',
-    prompt: "I want help with a UI/UX and product design project. Ask about the product, its users, and its current stage, then help with design questions, product decisions, progress updates, and next steps based on the details I share."
+    id: 'computer-vision',
+    title: 'Computer Vision Inspection',
+    prompt: "Tell me about the AI Quality Inspection System computer vision project — what it is, its purpose, features, tech stack, and the results."
   },
   {
-    id: 'cloud-devops',
-    title: 'Cloud & DevOps',
-    prompt: "I want help with a cloud architecture and DevOps project. Ask about my platform, constraints, and current stage, then help with architecture questions, implementation decisions, progress updates, and next steps based on the details I share."
+    id: 'gen-ai-content',
+    title: 'Gen AI Content Engine',
+    prompt: "Tell me about the Generative AI Content Engine project — what it is, its purpose, features, tech stack, and what results it delivered."
   },
   {
-    id: 'digital-growth',
-    title: 'Digital Growth',
-    prompt: "I want help with a digital growth project. Ask about my business, audience, goals, and current stage, then help with marketing questions, strategy decisions, progress updates, and next steps based on the details I share."
+    id: 'uiux-fintech',
+    title: 'FinTech UI/UX Redesign',
+    prompt: "Tell me about the UI/UX Redesign project for the FinTech web app — what it is, its purpose, design process, tools used, and the outcomes."
+  },
+  {
+    id: 'seo-marketing',
+    title: 'SEO & Marketing Campaign',
+    prompt: "Tell me about the SEO and Digital Marketing Growth Campaign project — what it involved, the strategy, tools used, and the results achieved."
   }
 ];
 
@@ -105,7 +110,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onToggle}
-            className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs z-40 lg:hidden"
+            className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs z-40"
           />
         )}
       </AnimatePresence>
