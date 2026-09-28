@@ -9,7 +9,8 @@ import {
   PanelLeft,
   Trash2,
   MessageSquare,
-  ChevronDown
+  ChevronDown,
+  CalendarDays
 } from 'lucide-react';
 import { ThinkArqLogo } from './ThinkArqLogo';
 
@@ -69,6 +70,8 @@ interface ChatSidebarProps {
   onClearHistory: () => void;
   onOpenLibrary: () => void;
   onSelectProject: (project: ProjectChatOption) => void;
+  onOpenBookings: () => void;
+  bookingsCount?: number;
 }
 
 export const ChatSidebar: React.FC<ChatSidebarProps> = ({
@@ -80,7 +83,9 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
   onNewChat,
   onClearHistory,
   onOpenLibrary,
-  onSelectProject
+  onSelectProject,
+  onOpenBookings,
+  bookingsCount = 0
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
@@ -173,8 +178,26 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
             <span>New chat</span>
           </button>
 
-          {/* Navigation Links: Library & Projects */}
+          {/* Navigation Links: Library, Projects, Bookings */}
           <div className="space-y-1 mb-4">
+            <button
+              onClick={() => {
+                onOpenBookings();
+                if (window.innerWidth < 1024) onToggle();
+              }}
+              className="w-full flex items-center justify-between gap-2.5 px-3 py-2 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 hover:text-slate-950 dark:hover:text-white text-xs font-medium transition cursor-pointer"
+            >
+              <span className="flex items-center gap-2.5">
+                <CalendarDays size={15} className="text-lime-600 dark:text-lime-400" />
+                <span>Bookings</span>
+              </span>
+              {bookingsCount > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-extrabold bg-[#A3E635] text-black shadow-xs">
+                  {bookingsCount}
+                </span>
+              )}
+            </button>
+
             <button
               onClick={() => {
                 onOpenLibrary();

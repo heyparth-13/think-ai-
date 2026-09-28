@@ -11,6 +11,8 @@ import { AboutModal } from './AboutModal';
 import { ServicesModal } from './ServicesModal';
 import { HireModal } from './HireModal';
 import { LibraryModal } from './LibraryModal';
+import { BookingsHistoryModal } from './BookingsHistoryModal';
+import { ConfirmedBooking, getStoredBookings } from '@/lib/bookings';
 import { RotateCcw, AlertCircle } from 'lucide-react';
 
 const STORAGE_KEY = 'thinkarq_ai_sessions_v1';
@@ -31,11 +33,13 @@ export const ChatWindow: React.FC = () => {
   const [isServicesOpen, setIsServicesOpen] = useState(false);
   const [isHireOpen, setIsHireOpen] = useState(false);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+  const [isBookingsOpen, setIsBookingsOpen] = useState(false);
+  const [bookings, setBookings] = useState<ConfirmedBooking[]>([]);
   const [leadRequirement, setLeadRequirement] = useState('');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Load sessions from localStorage
+  // Load sessions and bookings from localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
       document.documentElement.classList.remove('dark');
@@ -51,6 +55,18 @@ export const ChatWindow: React.FC = () => {
       } catch (e) {
         console.error('Error loading saved sessions:', e);
       }
+
+      // Load initial bookings
+      setBookings(getStoredBookings());
+
+      // Listen for bookings updates
+      const handleBookingsUpdate = (e: any) => {
+        if (e.detail && Array.isArray(e.detail)) {
+          setBookings(e.detail);
+        }
+      };
+      window.addEventListener('thinkarq_bookings_updated', handleBookingsUpdate);
+      return () => window.removeEventListener('thinkarq_bookings_updated', handleBookingsUpdate);
     }
   }, []);
 
@@ -251,6 +267,8 @@ export const ChatWindow: React.FC = () => {
         onClearHistory={handleClearHistory}
         onOpenLibrary={() => setIsLibraryOpen(true)}
         onSelectProject={handleStartProjectChat}
+        onOpenBookings={() => setIsBookingsOpen(true)}
+        bookingsCount={bookings.length}
       />
 
       {/* Main Content Area (pushes when sidebar opens on desktop) */}
@@ -264,7 +282,13 @@ export const ChatWindow: React.FC = () => {
           darkMode={darkMode}
           onToggleDarkMode={toggleDarkMode}
           onToggleSidebar={() => setIsSidebarOpen(prev => !prev)}
-          onBookCall={() => handleSendMessage('I want to book a 30-minute discovery call for my project.')}
+          onBookCall={() => {
+            if (bookings.length > 0) {
+              setIsBookingsOpen(true);
+            } else {
+              handleSendMessage('I want to book a 30-minute discovery call for my project.');
+            }
+          }}
           onExportChat={handleExportChat}
         />
 
@@ -330,6 +354,14 @@ export const ChatWindow: React.FC = () => {
       </div>
 
       {/* Modals */}
+      <BookingsHistoryModal
+        isOpen={isBookingsOpen}
+        onClose={() => setIsBookingsOpen(false)}
+        bookings={bookings}
+        onBookNewCall={() => handleSendMessage('I want to book a 30-minute discovery call for my project.')}
+        onUpdateBookings={setBookings}
+      />
+
       <LeadCaptureModal
         isOpen={isLeadCaptureOpen}
         onClose={() => setIsLeadCaptureOpen(false)}
