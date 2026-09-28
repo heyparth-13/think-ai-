@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   PenSquare,
   BookOpen,
@@ -101,32 +101,17 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
   );
 
   return (
-    <>
-      {/* Mobile Backdrop */}
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onToggle}
-            className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs z-40"
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Sidebar Container */}
-      <motion.aside
-        initial={false}
-        animate={{
-          width: isOpen ? 260 : 0,
-          opacity: isOpen ? 1 : 0
-        }}
-        transition={{ duration: 0.25, ease: 'easeInOut' }}
-        className={`fixed top-0 left-0 bottom-0 z-50 max-w-full bg-[#F9FAFB] dark:bg-[#0D0E15] border-r border-slate-200/80 dark:border-slate-800/80 flex flex-col overflow-hidden select-none ${
-          isOpen ? 'shadow-xl lg:shadow-none' : 'pointer-events-none'
-        }`}
-      >
+    <motion.aside
+      initial={false}
+      animate={{
+        width: isOpen ? 260 : 0,
+        opacity: isOpen ? 1 : 0
+      }}
+      transition={{ duration: 0.25, ease: 'easeInOut' }}
+      className={`fixed top-0 left-0 bottom-0 z-50 max-w-full bg-[#F9FAFB] dark:bg-[#0D0E15] border-r border-slate-200/80 dark:border-slate-800/80 flex flex-col overflow-hidden select-none ${
+        isOpen ? 'shadow-xl lg:shadow-none' : 'pointer-events-none'
+      }`}
+    >
         <div className="w-full max-w-[260px] h-full flex flex-col p-3.5">
           {/* Top Header: Logo + Search + Collapse Button */}
           <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-200/60 dark:border-slate-800/60">
@@ -294,7 +279,6 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
             </button>
           </div>
         </div>
-      </motion.aside>
-    </>
+    </motion.aside>
   );
 };

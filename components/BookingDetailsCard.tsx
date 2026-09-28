@@ -61,8 +61,16 @@ export const BookingDetailsCard: React.FC<BookingDetailsCardProps> = ({ projectS
       .finally(() => setIsLoadingSlots(false));
 
     const handleStorageUpdate = (e: any) => {
-      if (e.detail && Array.isArray(e.detail) && e.detail.length > 0) {
-        setConfirmedBooking(e.detail[0]);
+      if (e.detail && Array.isArray(e.detail)) {
+        if (e.detail.length > 0) {
+          setConfirmedBooking(prev => {
+            if (!prev) return e.detail[0];
+            const matching = e.detail.find((b: ConfirmedBooking) => b.id === prev.id || b.start === prev.start);
+            return matching || e.detail[0];
+          });
+        } else {
+          setConfirmedBooking(null);
+        }
       }
     };
     window.addEventListener('thinkarq_bookings_updated', handleStorageUpdate);
@@ -115,6 +123,7 @@ export const BookingDetailsCard: React.FC<BookingDetailsCardProps> = ({ projectS
 
       const newBooking: ConfirmedBooking = {
         id: `book_${Date.now()}`,
+        bookingUid: data.bookingUid,
         start: data.start,
         timeZone,
         name: name.trim(),

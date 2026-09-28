@@ -236,6 +236,9 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await response.json();
+    const rawBooking = result.data;
+    const bookingUid = rawBooking?.uid || rawBooking?.id || (typeof rawBooking === 'string' ? rawBooking : undefined);
+
     const notificationEmailSent = await sendBookingNotification({
       name,
       email,
@@ -246,12 +249,193 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      start: result.data?.start || startDate.toISOString(),
+      bookingUid: bookingUid ? String(bookingUid) : undefined,
+      start: rawBooking?.start || startDate.toISOString(),
       email,
       confirmationProvider: 'cal.com',
       notificationEmailSent
     });
   } catch {
     return NextResponse.json({ error: 'The booking request could not be completed. Please try again.' }, { status: 400 });
+  }
+}
+
+async function sendCancellationNotification(details: {
+  name: string;
+  email: string;
+  start: string;
+  timeZone: string;
+}): Promise<boolean> {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.BOOKING_FROM_EMAIL;
+  const to = process.env.BOOKING_NOTIFICATION_EMAIL;
+
+  if (!apiKey || !from || !to) return false;
+
+  try {
+    const formattedStart = details.start ? new Intl.DateTimeFormat('en-US', {
+      dateStyle: 'full',
+      timeStyle: 'short',
+      timeZone: details.timeZone || 'UTC'
+    }).format(new Date(details.start)) : details.start;
+
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from,
+        to: [to],
+        reply_to: details.email,
+        subject: `Cancelled ThinkArq call: ${details.name || details.email}`,
+        text: [
+          'A ThinkArq 30-minute discovery call was cancelled.',
+          '',
+          `Name: ${details.name || 'N/A'}`,
+          `Email: ${details.email}`,
+          `Scheduled Time: ${formattedStart}`,
+          '',
+          'The slot has been released.'
+        ].join('\n')
+      }),
+      cache: 'no-store'
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  const rateLimit = checkRateLimit(getClientIp(request));
+  if (!rateLimit.success) {
+    return NextResponse.json({ error: 'Too many requests. Please try again shortly.' }, { status: 429 });
+  }
+
+  const config = getCalConfig();
+  if (!config) {
+    return NextResponse.json({
+      success: true,
+      calCancelled: false,
+      message: 'Cal.com API is not configured. Removed from local history.'
+    });
+  }
+
+  try {
+    const body = await request.json().catch(() => ({}));
+    const bookingUid = typeof body.bookingUid === 'string' ? sanitizeInput(body.bookingUid) : '';
+    const email = typeof body.email === 'string' ? sanitizeInput(body.email).toLowerCase() : '';
+    const start = typeof body.start === 'string' ? body.start : '';
+    const name = typeof body.name === 'string' ? sanitizeInput(body.name) : '';
+    const timeZone = typeof body.timeZone === 'string' ? body.timeZone : 'UTC';
+    const cancellationReason = typeof body.cancellationReason === 'string'
+      ? sanitizeInput(body.cancellationReason)
+      : 'Cancelled by attendee via Think AI Chatbot';
+
+    let targetUid = bookingUid;
+
+    // If we don't have a direct bookingUid, attempt to find it on Cal.com by searching bookings
+    if (!targetUid && email) {
+      try {
+        const searchUrl = new URL(`${CAL_API_BASE}/bookings`);
+        searchUrl.searchParams.set('attendeeEmail', email);
+        const searchRes = await fetch(searchUrl, {
+          headers: {
+            Authorization: `Bearer ${config.apiKey}`,
+            'cal-api-version': BOOKING_API_VERSION
+          },
+          cache: 'no-store'
+        });
+
+        if (searchRes.ok) {
+          const searchData = await searchRes.json();
+          const items = Array.isArray(searchData.data) ? searchData.data : (searchData.data?.bookings || []);
+          const match = items.find((b: any) => {
+            if (start && b.start) {
+              return new Date(b.start).getTime() === new Date(start).getTime();
+            }
+            return true;
+          });
+          if (match?.uid || match?.id) {
+            targetUid = String(match.uid || match.id);
+          }
+        }
+      } catch (err) {
+        console.warn('Error querying Cal.com for booking UID:', err);
+      }
+    }
+
+    let calCancelled = false;
+
+    if (targetUid) {
+      // 1. Attempt Cal.com v2 cancellation: POST /v2/bookings/{bookingUid}/cancel
+      const cancelResponse = await fetch(`${CAL_API_BASE}/bookings/${encodeURIComponent(targetUid)}/cancel`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${config.apiKey}`,
+          'Content-Type': 'application/json',
+          'cal-api-version': BOOKING_API_VERSION
+        },
+        body: JSON.stringify({
+          cancellationReason
+        }),
+        cache: 'no-store'
+      });
+
+      if (cancelResponse.ok) {
+        calCancelled = true;
+      } else {
+        // 2. Attempt Cal.com v2 DELETE /v2/bookings/{bookingUid}
+        const deleteResponse = await fetch(`${CAL_API_BASE}/bookings/${encodeURIComponent(targetUid)}`, {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${config.apiKey}`,
+            'cal-api-version': BOOKING_API_VERSION
+          },
+          cache: 'no-store'
+        });
+
+        if (deleteResponse.ok) {
+          calCancelled = true;
+        } else {
+          // 3. Attempt Cal.com v1 fallback
+          const v1Response = await fetch(`https://api.cal.com/v1/bookings/${encodeURIComponent(targetUid)}/cancel?apiKey=${config.apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason: cancellationReason }),
+            cache: 'no-store'
+          });
+          if (v1Response.ok) {
+            calCancelled = true;
+          }
+        }
+      }
+    }
+
+    // Send email notification for cancellation if configured
+    await sendCancellationNotification({
+      name,
+      email,
+      start,
+      timeZone
+    });
+
+    return NextResponse.json({
+      success: true,
+      calCancelled,
+      bookingUid: targetUid || undefined,
+      message: calCancelled
+        ? 'Booking successfully cancelled on Cal.com and removed from history.'
+        : 'Removed from history.'
+    });
+  } catch (error) {
+    console.error('Error deleting booking:', error);
+    return NextResponse.json({
+      success: true,
+      calCancelled: false,
+      message: 'Booking removed from local history.'
+    });
   }
 }

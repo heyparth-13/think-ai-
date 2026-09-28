@@ -1,5 +1,6 @@
 export interface ConfirmedBooking {
   id: string;
+  bookingUid?: string;
   start: string;
   timeZone: string;
   name: string;
