@@ -28,10 +28,21 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose, onAskAb
             <X size={18} />
           </button>
 
+          {/* ThinkArq Banner */}
+          <div className="relative w-full h-28 sm:h-36 mb-4 rounded-2xl overflow-hidden border border-slate-200/80 dark:border-slate-800 shadow-xs">
+            <img
+              src="/thinkarq-banner.jpg"
+              alt="ThinkArq - Think. Build. Disrupt."
+              className="w-full h-full object-cover"
+            />
+          </div>
+
           <div className="flex items-center gap-2.5 mb-4 pr-8">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-700 to-purple-600 flex items-center justify-center text-white font-bold text-base sm:text-lg shadow-sm shrink-0">
-              T
-            </div>
+            <img
+              src="/logo.png"
+              alt="ThinkArq Logo"
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm shrink-0 object-contain bg-white dark:bg-slate-800 p-1"
+            />
             <div className="min-w-0">
               <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white truncate">
                 About Think AI
