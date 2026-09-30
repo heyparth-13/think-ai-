@@ -26,6 +26,7 @@ export const ChatWindow: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [darkMode, setDarkMode] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
 
   // Modals state
   const [isLeadCaptureOpen, setIsLeadCaptureOpen] = useState(false);
@@ -38,6 +39,7 @@ export const ChatWindow: React.FC = () => {
   const [leadRequirement, setLeadRequirement] = useState('');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Load sessions and bookings from localStorage
   useEffect(() => {
@@ -102,18 +104,172 @@ export const ChatWindow: React.FC = () => {
     }
   }, [messages, isLoading]);
 
+  const handleStartEdit = (msg: Message) => {
+    setEditingMessage(msg);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessage(null);
+  };
+
+  const handleStopGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsLoading(false);
+  };
+
+  const handleFeedback = (messageId: string, type: 'like' | 'dislike') => {
+    const updatedMessages = messages.map(m =>
+      m.id === messageId ? { ...m, feedback: m.feedback === type ? null : type } : m
+    );
+    setMessages(updatedMessages);
+
+    if (currentSessionId) {
+      const nextSessions = sessions.map(s =>
+        s.id === currentSessionId ? { ...s, messages: updatedMessages } : s
+      );
+      saveSessionsToStorage(nextSessions);
+    }
+  };
+
+  const handleRegenerate = async (messageId: string) => {
+    if (isLoading) return;
+
+    // Find the assistant message and its previous user prompt
+    const aiIndex = messages.findIndex(m => m.id === messageId);
+    if (aiIndex === -1) return;
+
+    // Locate the user prompt that triggered this assistant message
+    const userPromptIndex = messages.slice(0, aiIndex).reverse().findIndex(m => m.role === 'user');
+    if (userPromptIndex === -1) return;
+
+    const actualUserIndex = aiIndex - 1 - userPromptIndex;
+    const userMessage = messages[actualUserIndex];
+    if (!userMessage) return;
+
+    // Slice message list up to the user message
+    const historyBeforePrompt = messages.slice(0, actualUserIndex);
+    const newMessages = [...historyBeforePrompt, userMessage];
+    setMessages(newMessages);
+
+    // Cancel any previous controller and set up a new one
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    const sessionId = currentSessionId;
+    let nextSessions = sessions;
+
+    try {
+      const historyPayload = historyBeforePrompt.map(m => ({
+        role: m.role,
+        content: m.content
+      }));
+
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: abortController.signal,
+        body: JSON.stringify({
+          message: userMessage.content,
+          history: historyPayload
+        })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to generate response.');
+      }
+
+      const aiMsg: Message = {
+        id: `ai_${Date.now()}`,
+        role: 'assistant',
+        content: data.answer,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        sources: data.sources,
+        showLeadCTA: data.showLeadCTA,
+        bookingRequest: data.bookingRequest,
+        followUps: data.followUps
+      };
+
+      const finalMessages = [...newMessages, aiMsg];
+      setMessages(finalMessages);
+
+      if (sessionId) {
+        nextSessions = nextSessions.map(s =>
+          s.id === sessionId ? { ...s, timestamp: Date.now(), messages: finalMessages } : s
+        );
+        saveSessionsToStorage(nextSessions);
+      }
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.log('Regeneration stopped by user.');
+        return;
+      }
+      console.error('Chat error during regeneration:', err);
+      setErrorMessage(err.message || 'Something went wrong. Please try again.');
+    } finally {
+      setIsLoading(false);
+      abortControllerRef.current = null;
+    }
+  };
+
   const handleSendMessage = async (text: string, newSessionTitle?: string) => {
     if (!text.trim() || isLoading) return;
 
     setErrorMessage(null);
-    const userMsg: Message = {
-      id: `msg_${Date.now()}`,
-      role: 'user',
-      content: text.trim(),
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
 
-    const previousMessages = newSessionTitle ? [] : messages;
+    // Setup abort controller
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    let previousMessages: Message[] = [];
+    let userMsg: Message;
+    let isEditingSessionStart = false;
+
+    if (editingMessage && editingMessage.role === 'user') {
+      // Find the index of the message being edited
+      const targetIndex = messages.findIndex(m => m.id === editingMessage.id);
+      if (targetIndex !== -1) {
+        // Keep clean history prior to this message
+        previousMessages = messages.slice(0, targetIndex);
+        if (targetIndex === 0) {
+          isEditingSessionStart = true;
+        }
+      } else {
+        previousMessages = messages;
+      }
+
+      userMsg = {
+        id: editingMessage.id,
+        role: 'user',
+        content: text.trim(),
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isEdited: true
+      };
+      setEditingMessage(null);
+    } else {
+      previousMessages = newSessionTitle ? [] : messages;
+      userMsg = {
+        id: `msg_${Date.now()}`,
+        role: 'user',
+        content: text.trim(),
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setEditingMessage(null);
+    }
+
     const newMessages = [...previousMessages, userMsg];
     setMessages(newMessages);
     setIsLoading(true);
@@ -121,16 +277,24 @@ export const ChatWindow: React.FC = () => {
     // Update or create session
     let sessionId = newSessionTitle ? null : currentSessionId;
     let nextSessions = sessions;
+    const generatedTitle = text.trim().slice(0, 38) + (text.length > 38 ? '...' : '');
+
     if (!sessionId) {
       sessionId = `session_${Date.now()}`;
       setCurrentSessionId(sessionId);
       const newSession: ChatSession = {
         id: sessionId,
-        title: newSessionTitle || text.trim().slice(0, 38) + (text.length > 38 ? '...' : ''),
+        title: newSessionTitle || generatedTitle,
         timestamp: Date.now(),
         messages: newMessages
       };
       nextSessions = [newSession, ...sessions];
+      saveSessionsToStorage(nextSessions);
+    } else if (isEditingSessionStart) {
+      // Update session title if first prompt was edited
+      nextSessions = nextSessions.map(s =>
+        s.id === sessionId ? { ...s, title: generatedTitle, messages: newMessages } : s
+      );
       saveSessionsToStorage(nextSessions);
     }
 
@@ -143,6 +307,7 @@ export const ChatWindow: React.FC = () => {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: abortController.signal,
         body: JSON.stringify({
           message: text.trim(),
           history: historyPayload
@@ -162,7 +327,8 @@ export const ChatWindow: React.FC = () => {
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         sources: data.sources,
         showLeadCTA: data.showLeadCTA,
-        bookingRequest: data.bookingRequest
+        bookingRequest: data.bookingRequest,
+        followUps: data.followUps
       };
 
       const finalMessages = [...newMessages, aiMsg];
@@ -174,6 +340,10 @@ export const ChatWindow: React.FC = () => {
       );
       saveSessionsToStorage(nextSessions);
     } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.log('Chat generation stopped by user.');
+        return;
+      }
       console.error('Chat error:', err);
       setErrorMessage(err.message || 'Something went wrong. Please try again.');
       const fallbackAiMsg: Message = {
@@ -191,6 +361,7 @@ export const ChatWindow: React.FC = () => {
       saveSessionsToStorage(nextSessions);
     } finally {
       setIsLoading(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -199,26 +370,44 @@ export const ChatWindow: React.FC = () => {
   };
 
   const handleNewChat = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
     setMessages([]);
     setCurrentSessionId(null);
     setErrorMessage(null);
     setSelectedCategory('all');
+    setEditingMessage(null);
+    setIsLoading(false);
   };
 
   const handleSelectSession = (id: string) => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
     const found = sessions.find(s => s.id === id);
     if (found) {
       setCurrentSessionId(found.id);
       setMessages(found.messages || []);
       setErrorMessage(null);
+      setEditingMessage(null);
+      setIsLoading(false);
     }
   };
 
   const handleClearHistory = () => {
     if (confirm('Are you sure you want to clear your chat history?')) {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
       setSessions([]);
       setMessages([]);
       setCurrentSessionId(null);
+      setEditingMessage(null);
+      setIsLoading(false);
       localStorage.removeItem(STORAGE_KEY);
     }
   };
@@ -253,6 +442,9 @@ export const ChatWindow: React.FC = () => {
     setLeadRequirement(reqText || (messages.length > 0 ? messages[messages.length - 1]?.content : ''));
     setIsLeadCaptureOpen(true);
   };
+
+  // Find index of the last assistant message
+  const lastAssistantIndex = messages.map(m => m.role).lastIndexOf('assistant');
 
   return (
     <div className="relative flex min-h-dvh min-w-0 overflow-x-hidden bg-[#FAF9FC] text-slate-900 transition-colors duration-300 selection:bg-[#A3E635] selection:text-black dark:bg-[#0B0C16] dark:text-slate-100">
@@ -318,12 +510,18 @@ export const ChatWindow: React.FC = () => {
 
               {/* Messages Stream */}
               <div className="space-y-1">
-                {messages.map(msg => (
+                {messages.map((msg, index) => (
                   <ChatMessage
                     key={msg.id}
                     message={msg}
                     onBookCall={() => handleSendMessage('I want to book a 30-minute discovery call for my project.')}
                     onContactUs={() => openContactWithRequirement(msg.content)}
+                    onEdit={handleStartEdit}
+                    isBeingEdited={editingMessage?.id === msg.id}
+                    onRegenerate={handleRegenerate}
+                    onFeedback={handleFeedback}
+                    onSelectFollowUp={q => handleSendMessage(q)}
+                    isLastAssistant={index === lastAssistantIndex}
                   />
                 ))}
 
@@ -348,6 +546,9 @@ export const ChatWindow: React.FC = () => {
             <MessageInput
               onSendMessage={handleSendMessage}
               isLoading={isLoading}
+              editingMessage={editingMessage}
+              onCancelEdit={handleCancelEdit}
+              onStopGeneration={handleStopGeneration}
             />
           </div>
         </div>

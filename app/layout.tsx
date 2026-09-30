@@ -19,6 +19,9 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL || "https://www.thinkarq.com"
+  ),
   title: "Think AI | Intelligent Assistant & Digital Solutions",
   description: "Official AI Assistant for Think AI. Ask about our AI development, custom SaaS engineering, data pipelines, modern UI/UX design, and digital growth services.",
   keywords: [
@@ -33,7 +36,14 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "Think AI", url: "https://www.thinkarq.com" }],
   icons: {
-    icon: "/favicon.ico",
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/logo.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
   },
   openGraph: {
     title: "Think AI - Think. Build. Disrupt.",
@@ -42,6 +52,14 @@ export const metadata: Metadata = {
     siteName: "Think AI",
     locale: "en_US",
     type: "website",
+    images: [
+      {
+        url: "/og-image.jpg",
+        width: 1024,
+        height: 537,
+        alt: "ThinkArq - Think. Build. Disrupt.",
+      },
+    ],
   },
 };
 

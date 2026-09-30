@@ -49,7 +49,8 @@ export async function POST(req: NextRequest) {
       answer: result.answer,
       sources: result.sources,
       showLeadCTA: result.showLeadCTA,
-      bookingRequest: result.bookingRequest
+      bookingRequest: result.bookingRequest,
+      followUps: result.followUps
     });
   } catch (error) {
     console.error('Chat API Error:', error);

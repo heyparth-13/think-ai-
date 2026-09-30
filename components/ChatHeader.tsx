@@ -53,7 +53,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
 
           <button
             onClick={handleReloadPage}
-            className="flex items-center gap-1.5 group cursor-pointer focus:outline-hidden"
+            className="flex items-center gap-1.5 group curr focus:outline-hidden"
             title="Reload page"
             aria-label="Reload page"
           >
